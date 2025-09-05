@@ -14,11 +14,7 @@ if ticker:
         data = yf.download(ticker + "-USD", period="6mo", interval="1d")
 
         if not data.empty:
-            # ✅ Get latest closing price
-            latest_price = float(data["Close"].iloc[-1])
-            st.success(f"💰 {ticker} current price: ${latest_price:,.2f}")
-
-            # === Indicators ===
+            # ✅ Indicators
             data["SMA_14"] = data["Close"].rolling(window=14).mean()
 
             delta = data["Close"].diff()
@@ -27,18 +23,24 @@ if ticker:
             rs = gain / loss
             data["RSI_14"] = 100 - (100 / (1 + rs))
 
-            # Drop rows where indicators are NaN
-            data = data.dropna()
+            # ✅ Drop rows with NaN
+            data = data.dropna().copy()
 
-            # === Trading Signal ===
+            # ✅ Define signal logic safely
             def get_signal(row):
-                if row["RSI_14"] < 30 and row["Close"] > row["SMA_14"]:
-                    return "BUY"
-                elif row["RSI_14"] > 70 and row["Close"] < row["SMA_14"]:
-                    return "SELL"
+                if pd.notna(row["RSI_14"]) and pd.notna(row["SMA_14"]):
+                    if float(row["RSI_14"]) < 30 and float(row["Close"]) > float(row["SMA_14"]):
+                        return "BUY"
+                    elif float(row["RSI_14"]) > 70 and float(row["Close"]) < float(row["SMA_14"]):
+                        return "SELL"
                 return "HOLD"
 
             data["Signal"] = data.apply(get_signal, axis=1)
+
+            # ✅ Show latest price
+            latest_price = float(data["Close"].iloc[-1])
+            st.success(f"💰 {ticker} current price: ${latest_price:,.2f}")
+            st.info(f"Latest signal: {data['Signal'].iloc[-1]}")
 
             # === Backtesting ===
             position = None
@@ -55,7 +57,6 @@ if ticker:
                     trades.append(profit)
                     position = None
 
-            # Compute results
             if trades:
                 total_return = (1 + pd.Series(trades)).prod() - 1
                 win_rate = (pd.Series(trades) > 0).mean() * 100
@@ -71,7 +72,6 @@ if ticker:
             ax.plot(data.index, data["Close"], label="Close Price", color="blue")
             ax.plot(data.index, data["SMA_14"], label="14-day SMA", color="orange")
 
-            # Mark signals
             buy_signals = data[data["Signal"] == "BUY"]
             sell_signals = data[data["Signal"] == "SELL"]
             ax.scatter(buy_signals.index, buy_signals["Close"], marker="^", color="green", label="BUY", s=100)
