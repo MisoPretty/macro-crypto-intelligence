@@ -3,50 +3,55 @@ import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Title
-st.set_page_config(page_title="Macro-Crypto-Intelligence", page_icon="📊")
+st.set_page_config(page_title="Macro-Crypto-Intelligence", layout="wide")
+
 st.title("📊 Macro-Crypto-Intelligence")
 
-# Input
-ticker = st.text_input("Enter a crypto ticker (example: BTC, ETH, XRP):", "BTC").upper()
+ticker = st.text_input("Enter a crypto ticker (example: BTC, ETH, XRP):", "BTC")
 
 if ticker:
     try:
-        # Fetch data
-        data = yf.download(f"{ticker}-USD", period="6mo", interval="1d")
-        if data.empty:
-            st.error("No data found. Try another ticker like BTC, ETH, or XRP.")
-        else:
-            # Show current price
-            current_price = data["Close"].iloc[-1]
-            st.success(f"💰 {ticker} current price: ${current_price:,.2f}")
+        data = yf.download(ticker + "-USD", period="3mo", interval="1d")
 
-            # Moving Average
-            data["MA20"] = data["Close"].rolling(window=20).mean()
+        if not data.empty:
+            # ✅ Get latest closing price
+            latest_price = float(data["Close"].iloc[-1])
+            st.success(f"💰 {ticker} current price: ${latest_price:,.2f}")
 
-            # RSI Calculation
+            # === Indicators ===
+            # SMA (14-day)
+            data["SMA_14"] = data["Close"].rolling(window=14).mean()
+
+            # RSI (14-day)
             delta = data["Close"].diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            gain = (delta.where(delta > 0, 0)).rolling(14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
             rs = gain / loss
-            data["RSI"] = 100 - (100 / (1 + rs))
+            data["RSI_14"] = 100 - (100 / (1 + rs))
 
-            # Plot price + MA
+            # === Trading Signal ===
+            latest_rsi = data["RSI_14"].iloc[-1]
+            latest_sma = data["SMA_14"].iloc[-1]
+
+            if latest_rsi < 30 and latest_price > latest_sma:
+                signal = "🟢 BUY (Oversold & above SMA)"
+            elif latest_rsi > 70 and latest_price < latest_sma:
+                signal = "🔴 SELL (Overbought & below SMA)"
+            else:
+                signal = "🟡 HOLD (No strong signal)"
+
+            st.subheader("📈 Trading Signal")
+            st.info(signal)
+
+            # === Plot Price + SMA ===
             fig, ax = plt.subplots(figsize=(10, 5))
             ax.plot(data.index, data["Close"], label="Close Price", color="blue")
-            ax.plot(data.index, data["MA20"], label="20-Day MA", color="orange")
-            ax.set_title(f"{ticker} Price & Moving Average")
+            ax.plot(data.index, data["SMA_14"], label="14-day SMA", color="orange")
+            ax.set_title(f"{ticker} Price & SMA")
             ax.legend()
             st.pyplot(fig)
 
-            # Plot RSI
+            # === Plot RSI ===
             fig, ax = plt.subplots(figsize=(10, 3))
-            ax.plot(data.index, data["RSI"], label="RSI", color="purple")
-            ax.axhline(70, color="red", linestyle="--", alpha=0.7)
-            ax.axhline(30, color="green", linestyle="--", alpha=0.7)
-            ax.set_title(f"{ticker} Relative Strength Index (RSI)")
-            ax.legend()
-            st.pyplot(fig)
-
-    except Exception as e:
-        st.error(f"Error fetching data: {e}")
+            ax.plot(data.index, data["RSI_14"], label="RSI", color="purple")
+            ax.axhline(70, linestyle="--", color="red", alpha=0.5)
