@@ -19,15 +19,16 @@ if ticker:
             st.success(f"💰 {ticker} current price: ${latest_price:,.2f}")
 
             # === Indicators ===
-            # SMA (14-day)
             data["SMA_14"] = data["Close"].rolling(window=14).mean()
 
-            # RSI (14-day)
             delta = data["Close"].diff()
             gain = (delta.where(delta > 0, 0)).rolling(14).mean()
             loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
             rs = gain / loss
             data["RSI_14"] = 100 - (100 / (1 + rs))
+
+            # Drop rows where indicators are NaN
+            data = data.dropna()
 
             # === Trading Signal ===
             def get_signal(row):
