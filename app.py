@@ -7,15 +7,16 @@ st.set_page_config(page_title="Macro-Crypto-Intelligence", layout="wide")
 
 st.title("📊 Macro-Crypto-Intelligence with Backtesting")
 
+# Input ticker
 ticker = st.text_input("Enter a crypto ticker (example: BTC, ETH, XRP):", "BTC")
 
 if ticker:
     try:
-        # force single ticker, close only
-        data = yf.download(f"{ticker}-USD", period="6mo", interval="1d")
+        # Get data (longer period for more signals)
+        data = yf.download(f"{ticker}-USD", period="1y", interval="1d")
 
         if not data.empty:
-            # make sure columns are flat (avoid MultiIndex)
+            # Flatten column names if needed
             data.columns = [c[0] if isinstance(c, tuple) else c for c in data.columns]
 
             # === Indicators ===
@@ -27,23 +28,24 @@ if ticker:
             rs = gain / loss
             data["RSI_14"] = 100 - (100 / (1 + rs))
 
+            # Drop NaN rows
             data = data.dropna().copy()
 
-            # === Signal function (always returns str) ===
+            # === Signal logic (relaxed rules) ===
             def get_signal(row):
                 close = float(row["Close"])
                 sma = float(row["SMA_14"])
                 rsi = float(row["RSI_14"])
-                if rsi < 30 and close > sma:
+                if rsi < 40 and close > sma:
                     return "BUY"
-                elif rsi > 70 and close < sma:
+                elif rsi > 60 and close < sma:
                     return "SELL"
                 else:
                     return "HOLD"
 
             data["Signal"] = data.apply(get_signal, axis=1)
 
-            # === Latest price & signal ===
+            # === Show latest ===
             latest_price = float(data["Close"].iloc[-1])
             latest_signal = data["Signal"].iloc[-1]
             st.success(f"💰 {ticker} current price: ${latest_price:,.2f}")
@@ -70,7 +72,7 @@ if ticker:
             if trades:
                 total_return = (1 + pd.Series(trades)).prod() - 1
                 win_rate = (pd.Series(trades) > 0).mean() * 100
-                st.subheader("📊 Backtest Results (last 6 months)")
+                st.subheader("📊 Backtest Results (last 1 year)")
                 st.write(f"✅ Total Trades: {len(trades)}")
                 st.write(f"📈 Win Rate: {win_rate:.2f}%")
                 st.write(f"💵 Total Return: {total_return*100:.2f}%")
