@@ -83,4 +83,14 @@ if ticker:
             # === Plot RSI ===
             fig, ax = plt.subplots(figsize=(10, 3))
             ax.plot(data.index, data["RSI_14"], label="RSI", color="purple")
-            ax.axhline(70,
+            ax.axhline(70, linestyle="--", color="red", alpha=0.5)
+            ax.axhline(30, linestyle="--", color="green", alpha=0.5)
+            ax.set_title(f"{ticker} RSI (14)")
+            ax.legend()
+            st.pyplot(fig)
+
+        else:
+            st.error("⚠️ No data found for this ticker.")
+
+    except Exception as e:
+        st.error(f"Error fetching data: {e}")
