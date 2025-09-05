@@ -9,7 +9,7 @@ st.title("📊 Macro-Crypto-Intelligence")
 
 st.write("Use CoinGecko names: e.g. `bitcoin`, `ethereum`, `ripple`, `solana`")
 
-ticker = st.text_input("Enter a crypto (CoinGecko ID):", "bitcoin")
+ticker = st.text_input("Enter a crypto (CoinGecko ID):", "btc")
 
 if ticker:
     try:
