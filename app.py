@@ -11,36 +11,43 @@ ticker = st.text_input("Enter a crypto ticker (example: BTC, ETH, XRP):", "BTC")
 
 if ticker:
     try:
-        data = yf.download(ticker + "-USD", period="6mo", interval="1d")
+        # force single ticker, close only
+        data = yf.download(f"{ticker}-USD", period="6mo", interval="1d")
 
         if not data.empty:
-            # ✅ Indicators
+            # make sure columns are flat (avoid MultiIndex)
+            data.columns = [c[0] if isinstance(c, tuple) else c for c in data.columns]
+
+            # === Indicators ===
             data["SMA_14"] = data["Close"].rolling(window=14).mean()
 
             delta = data["Close"].diff()
-            gain = (delta.where(delta > 0, 0)).rolling(14).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+            gain = delta.clip(lower=0).rolling(14).mean()
+            loss = -delta.clip(upper=0).rolling(14).mean()
             rs = gain / loss
             data["RSI_14"] = 100 - (100 / (1 + rs))
 
-            # ✅ Drop rows with NaN
             data = data.dropna().copy()
 
-            # ✅ Define signal logic safely
+            # === Signal function (always returns str) ===
             def get_signal(row):
-                if pd.notna(row["RSI_14"]) and pd.notna(row["SMA_14"]):
-                    if float(row["RSI_14"]) < 30 and float(row["Close"]) > float(row["SMA_14"]):
-                        return "BUY"
-                    elif float(row["RSI_14"]) > 70 and float(row["Close"]) < float(row["SMA_14"]):
-                        return "SELL"
-                return "HOLD"
+                close = float(row["Close"])
+                sma = float(row["SMA_14"])
+                rsi = float(row["RSI_14"])
+                if rsi < 30 and close > sma:
+                    return "BUY"
+                elif rsi > 70 and close < sma:
+                    return "SELL"
+                else:
+                    return "HOLD"
 
             data["Signal"] = data.apply(get_signal, axis=1)
 
-            # ✅ Show latest price
+            # === Latest price & signal ===
             latest_price = float(data["Close"].iloc[-1])
+            latest_signal = data["Signal"].iloc[-1]
             st.success(f"💰 {ticker} current price: ${latest_price:,.2f}")
-            st.info(f"Latest signal: {data['Signal'].iloc[-1]}")
+            st.info(f"📍 Latest signal: {latest_signal}")
 
             # === Backtesting ===
             position = None
@@ -48,11 +55,14 @@ if ticker:
             trades = []
 
             for i, row in data.iterrows():
-                if row["Signal"] == "BUY" and position is None:
+                close = float(row["Close"])
+                signal = row["Signal"]
+
+                if signal == "BUY" and position is None:
                     position = "LONG"
-                    entry_price = row["Close"]
-                elif row["Signal"] == "SELL" and position == "LONG":
-                    exit_price = row["Close"]
+                    entry_price = close
+                elif signal == "SELL" and position == "LONG":
+                    exit_price = close
                     profit = (exit_price - entry_price) / entry_price
                     trades.append(profit)
                     position = None
