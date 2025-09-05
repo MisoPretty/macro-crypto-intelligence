@@ -1,39 +1,62 @@
-import streamlit as st
-import requests
-import pandas as pd
-import pandas_ta as ta
+# app.py
+# (unchanged code above remains)
 
-st.set_page_config(page_title="Macro Crypto Intelligence", layout="wide")
+# =========================
+# requirements.txt (place in project root)
+# =========================
+# streamlit web app framework
+streamlit
+# core data
+pandas
+numpy
+requests
+# technical indicators
+pandas_ta
+# RSS parsing
+feedparser
 
-st.title("📊 Macro-Crypto-Intelligence")
+# =========================
+# README.md (place in project root)
+# =========================
+# Macro‑Crypto Intelligence MVP
 
-st.write("Use CoinGecko names: e.g. `bitcoin`, `ethereum`, `ripple`, `solana`")
+🧠 **Macro‑Crypto Intelligence** is a free Streamlit web app that combines:
+- Macro & liquidity proxies (BTC trend + stablecoin caps)
+- Micro/technical analysis (EMA, RSI, ATR‑like)
+- Geopolitical & economic event summaries (free RSS feeds)
+- Simple transparent projections & adaptive exit levels
+- XRP‑specific relative strength & volume signals
 
-ticker = st.text_input("Enter a crypto (CoinGecko ID):", "btc")
+## Features
+- Enter any crypto ticker (BTC, ETH, XRP, SOL, etc.)
+- Live charts with EMAs (50/200)
+- Market regime snapshot (ON/OFF proxy)
+- Stablecoin capitalization snapshot
+- News headlines from Reuters, BBC, IMF, CoinDesk, CoinTelegraph, The Block
+- Simple forward projection (14 days) & ATR‑based stop/targets
+- XRP special: RS vs BTC + volume Z‑score
 
-if ticker:
-    try:
-        # fetch last 90 days of daily prices
-        url = f"https://api.coingecko.com/api/v3/coins/{ticker.lower()}/market_chart?vs_currency=usd&days=90&interval=daily"
-        r = requests.get(url)
-        data = r.json()
+## Quickstart
+```bash
+# 1. Clone repository
+# git clone https://github.com/yourname/macro-crypto-intelligence
+# cd macro-crypto-intelligence
 
-        if "prices" in data:
-            df = pd.DataFrame(data["prices"], columns=["timestamp", "price"])
-            df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+# 2. Install dependencies
+pip install -r requirements.txt
 
-            # TA indicators
-            df["SMA20"] = ta.sma(df["price"], length=20)
-            df["RSI14"] = ta.rsi(df["price"], length=14)
+# 3. Launch Streamlit app
+streamlit run app.py
+```
 
-            # show chart with price + SMA20
-            st.line_chart(df.set_index("timestamp")[["price", "SMA20"]])
+## Deployment (Free)
+Deploy to **Streamlit Community Cloud**:
+1. Push repo to GitHub.
+2. Go to [share.streamlit.io](https://share.streamlit.io).
+3. Connect repo and select `app.py` as entrypoint.
+4. App runs free, 24/7.
 
-            # show last few rows with RSI
-            st.subheader("Latest data")
-            st.write(df.tail())
-
-        else:
-            st.error("⚠️ Could not fetch historical data. Try another coin.")
-    except Exception as e:
-        st.error(f"API error: {e}")
+## Notes
+- Data via free public endpoints (CoinGecko, RSS).
+- Educational prototype, **not financial advice**.
+- Extend with free exchange endpoints (Binance, Deribit) for OHLC/ATR, funding, basis, and ETF flows.
