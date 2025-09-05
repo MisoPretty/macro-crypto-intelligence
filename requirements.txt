@@ -1,0 +1,6 @@
+streamlit
+pandas
+numpy
+requests
+pandas_ta
+feedparser
