@@ -5,13 +5,13 @@ import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="Macro-Crypto-Intelligence", layout="wide")
 
-st.title("📊 Macro-Crypto-Intelligence")
+st.title("📊 Macro-Crypto-Intelligence with Backtesting")
 
 ticker = st.text_input("Enter a crypto ticker (example: BTC, ETH, XRP):", "BTC")
 
 if ticker:
     try:
-        data = yf.download(ticker + "-USD", period="3mo", interval="1d")
+        data = yf.download(ticker + "-USD", period="6mo", interval="1d")
 
         if not data.empty:
             # ✅ Get latest closing price
@@ -30,38 +30,57 @@ if ticker:
             data["RSI_14"] = 100 - (100 / (1 + rs))
 
             # === Trading Signal ===
-            latest_rsi = data["RSI_14"].iloc[-1]
-            latest_sma = data["SMA_14"].iloc[-1]
+            def get_signal(row):
+                if row["RSI_14"] < 30 and row["Close"] > row["SMA_14"]:
+                    return "BUY"
+                elif row["RSI_14"] > 70 and row["Close"] < row["SMA_14"]:
+                    return "SELL"
+                return "HOLD"
 
-            if latest_rsi < 30 and latest_price > latest_sma:
-                signal = "🟢 BUY (Oversold & above SMA)"
-            elif latest_rsi > 70 and latest_price < latest_sma:
-                signal = "🔴 SELL (Overbought & below SMA)"
+            data["Signal"] = data.apply(get_signal, axis=1)
+
+            # === Backtesting ===
+            position = None
+            entry_price = 0
+            trades = []
+
+            for i, row in data.iterrows():
+                if row["Signal"] == "BUY" and position is None:
+                    position = "LONG"
+                    entry_price = row["Close"]
+                elif row["Signal"] == "SELL" and position == "LONG":
+                    exit_price = row["Close"]
+                    profit = (exit_price - entry_price) / entry_price
+                    trades.append(profit)
+                    position = None
+
+            # Compute results
+            if trades:
+                total_return = (1 + pd.Series(trades)).prod() - 1
+                win_rate = (pd.Series(trades) > 0).mean() * 100
+                st.subheader("📊 Backtest Results (last 6 months)")
+                st.write(f"✅ Total Trades: {len(trades)}")
+                st.write(f"📈 Win Rate: {win_rate:.2f}%")
+                st.write(f"💵 Total Return: {total_return*100:.2f}%")
             else:
-                signal = "🟡 HOLD (No strong signal)"
+                st.info("No completed trades in this period.")
 
-            st.subheader("📈 Trading Signal")
-            st.info(signal)
-
-            # === Plot Price + SMA ===
+            # === Plot Price + SMA + Signals ===
             fig, ax = plt.subplots(figsize=(10, 5))
             ax.plot(data.index, data["Close"], label="Close Price", color="blue")
             ax.plot(data.index, data["SMA_14"], label="14-day SMA", color="orange")
-            ax.set_title(f"{ticker} Price & SMA")
+
+            # Mark signals
+            buy_signals = data[data["Signal"] == "BUY"]
+            sell_signals = data[data["Signal"] == "SELL"]
+            ax.scatter(buy_signals.index, buy_signals["Close"], marker="^", color="green", label="BUY", s=100)
+            ax.scatter(sell_signals.index, sell_signals["Close"], marker="v", color="red", label="SELL", s=100)
+
+            ax.set_title(f"{ticker} Price, SMA & Signals")
             ax.legend()
             st.pyplot(fig)
 
             # === Plot RSI ===
             fig, ax = plt.subplots(figsize=(10, 3))
             ax.plot(data.index, data["RSI_14"], label="RSI", color="purple")
-            ax.axhline(70, linestyle="--", color="red", alpha=0.5)
-            ax.axhline(30, linestyle="--", color="green", alpha=0.5)
-            ax.set_title(f"{ticker} RSI (14)")
-            ax.legend()
-            st.pyplot(fig)
-
-        else:
-            st.error("⚠️ No data found for this ticker.")
-
-    except Exception as e:
-        st.error(f"Error fetching data: {e}")
+            ax.axhline(70,
