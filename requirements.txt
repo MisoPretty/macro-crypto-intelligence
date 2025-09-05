@@ -4,3 +4,6 @@ numpy
 requests
 pandas_ta
 feedparser
+yfinance
+pandas
+matplotlib
